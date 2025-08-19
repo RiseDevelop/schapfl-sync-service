@@ -1,0 +1,29 @@
+FROM arm32v7/debian:bullseye
+
+# Install OpenJDK 17
+RUN apt-get update && \
+    apt-get install -y openjdk-17-jdk && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd -u 185 -r -s /sbin/nologin appuser
+
+# Set environment variables
+ENV QUARKUS_PROFILE=prod
+ENV LANGUAGE='en_US:en' \
+    JAVA_OPTS_APPEND="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager" \
+    JAVA_APP_JAR="/deployments/quarkus-run.jar"
+ENV LANG=C.UTF-8
+
+# Copy application artifacts
+COPY --chown=185:185 target/quarkus-app/lib/ /deployments/lib/
+COPY --chown=185:185 target/quarkus-app/*.jar /deployments/
+COPY --chown=185:185 target/quarkus-app/app/ /deployments/app/
+COPY --chown=185:185 target/quarkus-app/quarkus/ /deployments/quarkus/
+
+# Network config and user
+EXPOSE 8080
+USER 185
+
+ENTRYPOINT ["java", "-jar", "/deployments/quarkus-run.jar"]
