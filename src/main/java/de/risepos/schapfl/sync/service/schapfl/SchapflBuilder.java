@@ -2,6 +2,7 @@ package de.risepos.schapfl.sync.service.schapfl;
 
 import de.risepos.schapfl.sync.service.dto.ArticlePosDto;
 import jakarta.enterprise.context.ApplicationScoped;
+import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.math.RoundingMode;
@@ -11,10 +12,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @ApplicationScoped
+@Slf4j
 public class SchapflBuilder {
 
     @ConfigProperty(name = "schapfl.store-number") int store;
     @ConfigProperty(name = "schapfl.lane-number") int lane;
+    @ConfigProperty(name = "articlegroup.ids.weight-ean") List<Long> weightEanArticlegroupIds;
 
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
@@ -127,12 +130,24 @@ public class SchapflBuilder {
     private List<String> buildMehRows(ArticlePosDto dto) {
         if (dto.getScancodes() == null || dto.getScancodes().isEmpty()) return List.of();
         String eanHaupt = String.valueOf(dto.getId());
+
+        Long ag = dto.getArticlegroup_id();
         String index = "0";
         String bez = Optional.ofNullable(dto.getDescription()).orElse("");
 
         List<String> rows = new ArrayList<>();
         for (String code : dto.getScancodes()) {
-            if (code == null || code.isBlank()) continue;
+            if (code == null || code.isBlank() || code.length() > 14) continue;
+
+            if (ag != null && weightEanArticlegroupIds != null
+                    && weightEanArticlegroupIds.contains(ag)
+            ) {
+                if (code.length() > 7) {
+                    code = code.substring(0, 7);
+                    log.info("Scancode is {}", code);
+                }
+            }
+
             rows.add(String.join(";", eanHaupt, index, code.trim(), bez, "", "0"));
         }
         return rows;
